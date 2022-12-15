@@ -1,2 +1,2 @@
 # UKCS Hub Spreadsheet Automatation
-[<img src="https://imgur.com/a/ntc7MLJ">]
+![ukcs spreadsheet image](https://imgur.com/a/ntc7MLJ)
