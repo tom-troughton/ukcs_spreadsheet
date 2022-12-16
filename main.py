@@ -211,7 +211,12 @@ def main():
     # Looping over each ESEA division and getting stats for that division
     esea_stats = []
     for division in division_urls:
-        esea_stats.append(get_stats(division_urls=division_urls, division=division, season=season, country=country, additional_teams=additional_teams, blacklisted_teams=blacklisted_teams))
+        esea_stats.append(get_stats(division_urls=division_urls, 
+                                    division=division, 
+                                    season=season, 
+                                    country=country, 
+                                    additional_teams=additional_teams, 
+                                    blacklisted_teams=blacklisted_teams))
         time.sleep(3)
 
     # Create dataframe from all gathered stats
