@@ -74,7 +74,7 @@ def upload_stats(df: pd.DataFrame, client, worksheet):
 
 
 def main():
-    season = int(input('Enter season number: '))
+    season = int(input('Enter ESEA season number: '))
     client = google_sheet_auth()
 
     players_df = get_players(client)

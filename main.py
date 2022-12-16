@@ -90,12 +90,25 @@ def get_remove_teams(client) -> list:
     """
     remove_teams_sheet = client.open('UKCS Hub Sheet').worksheet('Remove Teams')
     remove_teams_df = pd.DataFrame(remove_teams_sheet.get_all_records())
-    teams_list = list(remove_teams_df['esea_page'].values)
 
-    # Removing https://play.esea.net prefix
-    teams_list = ['/' + '/'.join(team.split('/')[-2:]) for team in teams_list]
+    if not remove_teams_df.empty:
+        teams_list = list(remove_teams_df['esea_page'].values)
 
-    return teams_list
+        # Removing https://play.esea.net prefix
+        teams_list = ['/' + '/'.join(team.split('/')[-2:]) for team in teams_list]
+
+        return teams_list
+    else:
+        return []
+
+
+def sheet_img_formula(img_url):
+    if not isinstance(img_url, str):
+        return ''
+    elif not img_url.startswith('https://'):
+        return f'=IMAGE("https:{img_url}")'
+    else:
+        return f'=IMAGE("{img_url}")'
 
 
 def create_stats_df(esea_stats: list) -> pd.DataFrame:
@@ -104,9 +117,6 @@ def create_stats_df(esea_stats: list) -> pd.DataFrame:
     """
     stats_merged = list(itertools.chain.from_iterable(esea_stats))
     df = pd.DataFrame.from_records(stats_merged)
-
-    def sheet_img_formula(img_url):
-        return f'=IMAGE("https:{img_url}")'
 
     def create_record(w, l):
         return f'{w}-{l}'
@@ -167,7 +177,7 @@ def add_pro_teams(df: pd.DataFrame, client) -> pd.DataFrame:
     pro_sheet = client.open('UKCS Hub Sheet').worksheet('Pro/Ch Teams')
     pro_sheet_df = pd.DataFrame(pro_sheet.get_all_records())
 
-    pro_sheet_df['logo_formula'] = ''
+    pro_sheet_df['logo_formula'] = pro_sheet_df['logo_url'].apply(lambda x: sheet_img_formula(x))
     pro_sheet_df = pro_sheet_df[['team_name', 'logo_formula', 'players', 'division', 'record', 'page_url', 'coach']]
 
     df = pd.concat([pro_sheet_df, df])
@@ -184,7 +194,7 @@ def upload_stats(df: pd.DataFrame, client, worksheet):
 
 
 def main():
-    season = int(input('Enter ESEA season: '))
+    season = int(input('Enter ESEA season number: '))
     country = 'United Kingdom'
 
     division_urls = {'advanced': f'https://play.esea.net/league/standings?filters[game]=25&filters[season]={season+175}&filters[region]=2&filters[round]=regular%20season&filters[level]=advanced',
