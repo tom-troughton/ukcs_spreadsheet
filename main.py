@@ -1,8 +1,10 @@
+"""
+This script is for scraping data from ESEA and uploading it to the Google sheet.
+"""
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-from selenium_stealth import stealth
 import undetected_chromedriver as uc
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -11,6 +13,7 @@ import time
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
 import gspread_dataframe as gd
+from progress.bar import Bar
 
 
 def get_stats(division_urls: dict, division: str, season: int, country: str = 'United Kingdom', additional_teams: list = [], blacklisted_teams: list = []) -> list[dict]:
@@ -20,6 +23,9 @@ def get_stats(division_urls: dict, division: str, season: int, country: str = 'U
     Additional teams can be added if for example they do not have the correct country classification
     Entries in the additional_teams are url suffixes for play.esea.net. Each entry must have the following format: '/teams/xxxxxxx'
     """
+    # bar = Bar(f'Getting {division} stats', max=100)
+    # bar.next()
+    print(f'Getting {division} statistics...')
     try:
         options = webdriver.ChromeOptions()
         options.add_argument('--user-agent=cat')
@@ -29,6 +35,9 @@ def get_stats(division_urls: dict, division: str, season: int, country: str = 'U
         WebDriverWait(driver, 5).until(EC.visibility_of_element_located((By.TAG_NAME, 'table')))
     except Exception as error:
         print(error)
+
+    # for i in range(69):
+    #     bar.next()
 
     soup = BeautifulSoup(driver.page_source, 'html.parser')
 
@@ -45,6 +54,9 @@ def get_stats(division_urls: dict, division: str, season: int, country: str = 'U
     for team in blacklisted_teams:
         if team in team_urls:
             team_urls.remove(team)
+
+    # for i in range(15):
+    #     bar.next()
 
     output = []
     for row in soup.find_all('tr')[1:]:
@@ -63,6 +75,10 @@ def get_stats(division_urls: dict, division: str, season: int, country: str = 'U
                 
             team_stats = {'team_name': team_name, 'logo_url': logo_url, 'wins': wins, 'losses': losses, 'win_streak': win_streak, 'division': division, 'page_url': page_url}
             output.append(team_stats)
+
+    # for i in range(15):
+    #     bar.next()
+    # bar.finish()
 
     driver.close()
     driver.quit()
@@ -219,6 +235,7 @@ def main():
     blacklisted_teams = get_remove_teams(client)
 
     # Looping over each ESEA division and getting stats for that division
+    print('Getting team statistics from ESEA...')
     esea_stats = []
     for division in division_urls:
         esea_stats.append(get_stats(division_urls=division_urls, 
@@ -238,7 +255,9 @@ def main():
     df = add_pro_teams(df, client)
     
     # Uploading the dataframe to google sheets
+    print('Uploading statistics to Google Sheets...')
     upload_stats(df, client, f'Season {season}')
+    print('Complete.')
 
 
 if __name__ == "__main__":

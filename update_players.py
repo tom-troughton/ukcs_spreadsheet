@@ -1,3 +1,7 @@
+"""
+This script is for updating the main spreadsheet with players and coaches.
+The script retrieves player and coach data from the respective worksheets and joins them to the main spreadsheet.
+"""
 import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
@@ -75,15 +79,21 @@ def upload_stats(df: pd.DataFrame, client, worksheet):
 
 def main():
     season = int(input('Enter ESEA season number: '))
+    print('Authenticating with Google sheets...')
     client = google_sheet_auth()
 
+    print('Retrieving player and coach data...')
     players_df = get_players(client)
     coaches_df = get_coaches(client)
 
+    print(f'Retrieving Season {season} spreadsheet...')
     df = get_main_sheet(client, season=season)
     df = join_and_drop(df=df, players_df=players_df, coaches_df=coaches_df)
 
+    print('Uploading changes...')
     upload_stats(df, client, f'Season {season}')
+
+    print('Complete.')
 
 
 if __name__ == "__main__":
