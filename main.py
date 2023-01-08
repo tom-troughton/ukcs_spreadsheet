@@ -13,7 +13,6 @@ import time
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
 import gspread_dataframe as gd
-from progress.bar import Bar
 
 
 def get_stats(division_urls: dict, division: str, season: int, country: str = 'United Kingdom', additional_teams: list = [], blacklisted_teams: list = []) -> list[dict]:
@@ -30,14 +29,12 @@ def get_stats(division_urls: dict, division: str, season: int, country: str = 'U
         options = webdriver.ChromeOptions()
         options.add_argument('--user-agent=cat')
         options.add_argument("start-maximized")
+        options.add_argument("--headless")
         driver = uc.Chrome(options=options)
         driver.get(division_urls[division])
         WebDriverWait(driver, 5).until(EC.visibility_of_element_located((By.TAG_NAME, 'table')))
     except Exception as error:
         print(error)
-
-    # for i in range(69):
-    #     bar.next()
 
     soup = BeautifulSoup(driver.page_source, 'html.parser')
 
@@ -54,9 +51,6 @@ def get_stats(division_urls: dict, division: str, season: int, country: str = 'U
     for team in blacklisted_teams:
         if team in team_urls:
             team_urls.remove(team)
-
-    # for i in range(15):
-    #     bar.next()
 
     output = []
     for row in soup.find_all('tr')[1:]:
@@ -75,10 +69,6 @@ def get_stats(division_urls: dict, division: str, season: int, country: str = 'U
                 
             team_stats = {'team_name': team_name, 'logo_url': logo_url, 'wins': wins, 'losses': losses, 'win_streak': win_streak, 'division': division, 'page_url': page_url}
             output.append(team_stats)
-
-    # for i in range(15):
-    #     bar.next()
-    # bar.finish()
 
     driver.close()
     driver.quit()
