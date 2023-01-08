@@ -5,7 +5,6 @@ Useful for backup purposes.
 import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
-import gspread_dataframe as gd
 
 
 def google_sheet_auth(key_file):
