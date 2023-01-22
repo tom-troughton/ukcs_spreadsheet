@@ -77,11 +77,15 @@ def get_stats(division_urls: dict, division: str, season: int, country: str = 'U
     return output
 
 
-def get_additional_teams(client) -> list:
+def open_main_sheet(client, sheet_name):
+    return client.open(sheet_name)
+
+
+def get_additional_teams(client, main_sheet) -> list:
     """
     Retrieves a table of teams (which are to be added)and their ESEA urls from Google Sheets and returns a list of these urls.
     """
-    add_teams_sheet = client.open('UKCS Hub Sheet').worksheet('Additional Teams')
+    add_teams_sheet = main_sheet.worksheet('Additional Teams')
     add_teams_df = pd.DataFrame(add_teams_sheet.get_all_records())
     teams_list = list(add_teams_df['esea_page'].values)
 
@@ -91,11 +95,11 @@ def get_additional_teams(client) -> list:
     return teams_list
 
 
-def get_remove_teams(client) -> list:
+def get_remove_teams(client, main_sheet) -> list:
     """
     This function retrieves a table of teams from Google Sheets which are to be removed.
     """
-    remove_teams_sheet = client.open('UKCS Hub Sheet').worksheet('Remove Teams')
+    remove_teams_sheet = main_sheet.worksheet('Remove Teams')
     remove_teams_df = pd.DataFrame(remove_teams_sheet.get_all_records())
 
     if not remove_teams_df.empty:
@@ -109,8 +113,8 @@ def get_remove_teams(client) -> list:
         return []
 
 
-def get_team_names(client) -> pd.DataFrame:
-    names_sheet = client.open('UKCS Hub Sheet').worksheet('Team Names')
+def get_team_names(client, main_sheet) -> pd.DataFrame:
+    names_sheet = main_sheet.worksheet('Team Names')
     names_df = pd.DataFrame(names_sheet.get_all_records())
     return names_df
 
@@ -147,11 +151,11 @@ def create_stats_df(esea_stats: list, names_df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def add_coaches(df: pd.DataFrame, client) -> pd.DataFrame:
+def add_coaches(df: pd.DataFrame, client, main_sheet) -> pd.DataFrame:
     """
     This function retrieves a table of coaches from Google Sheets and appends them to their respective teams.
     """
-    coaches_sheet = client.open('UKCS Hub Sheet').worksheet('Coaches')
+    coaches_sheet = main_sheet.worksheet('Coaches')
     coaches_df = pd.DataFrame(coaches_sheet.get_all_records())
 
     df = pd.merge(df, coaches_df, left_on='page_url', right_on='esea_page', how='left')
@@ -160,11 +164,11 @@ def add_coaches(df: pd.DataFrame, client) -> pd.DataFrame:
     return df
 
 
-def add_players(df: pd.DataFrame, client) -> pd.DataFrame:
+def add_players(df: pd.DataFrame, client, main_sheet) -> pd.DataFrame:
     """
     This function retrieves a table of players from Google Sheets and appends them to their respective teams.
     """
-    players_sheet = client.open('UKCS Hub Sheet').worksheet('Players')
+    players_sheet = main_sheet.worksheet('Players')
     players_df = pd.DataFrame(players_sheet.get_all_records())
 
     df = pd.merge(df, players_df, left_on='page_url', right_on='esea_page', how='left')
@@ -180,11 +184,11 @@ def reorder_df(df: pd.DataFrame) -> pd.DataFrame:
     return df[['team_name', 'logo_formula', 'players', 'division', 'record', 'page_url', 'coach']]
 
 
-def add_pro_teams(df: pd.DataFrame, client) -> pd.DataFrame:
+def add_pro_teams(df: pd.DataFrame, client, main_sheet) -> pd.DataFrame:
     """
     This function adds Pro/Challenger teams to the dataframe which are not listed on ESEA or are listed differently.
     """
-    pro_sheet = client.open('UKCS Hub Sheet').worksheet('Pro/Ch Teams')
+    pro_sheet = main_sheet.worksheet('Pro/Ch Teams')
     pro_sheet_df = pd.DataFrame(pro_sheet.get_all_records())
 
     pro_sheet_df['logo_formula'] = pro_sheet_df['logo_url'].apply(lambda x: sheet_img_formula(x))
@@ -195,11 +199,11 @@ def add_pro_teams(df: pd.DataFrame, client) -> pd.DataFrame:
     return df
 
 
-def upload_stats(df: pd.DataFrame, client, worksheet):
+def upload_stats(df: pd.DataFrame, client, worksheet, main_sheet):
     """
     Uploading the dataframe to the main worksheet.
     """
-    sheet = client.open('UKCS Hub Sheet').worksheet(worksheet)
+    sheet = main_sheet.worksheet(worksheet)
     gd.set_with_dataframe(sheet, df, row=2, include_column_header=False)
 
 
@@ -221,12 +225,15 @@ def main():
     creds = ServiceAccountCredentials.from_json_keyfile_name('ukcs-spreadsheet-6b9ba266c9cb.json', scope)
     client = gspread.authorize(creds)
 
-    # Opening the main worksheet
-    sheet = client.open('UKCS Hub Sheet').worksheet(f'Season {season}')
+    # Opening the overall sheet only once
+    main_sheet = open_main_sheet(client=client, sheet_name='UKCS Hub Sheet')
+
+    # Opening the main season worksheet
+    # sheet = main_sheet.worksheet(f'Season {season}')
 
     # Getting teams to add/remove
-    additional_teams = get_additional_teams(client)
-    blacklisted_teams = get_remove_teams(client)
+    additional_teams = get_additional_teams(client, main_sheet)
+    blacklisted_teams = get_remove_teams(client, main_sheet)
 
     # Looping over each ESEA division and getting stats for that division
     print('Getting team statistics from ESEA...')
@@ -240,19 +247,19 @@ def main():
                                     blacklisted_teams=blacklisted_teams))
         time.sleep(1.5)
 
-    names_df = get_team_names(client=client)
+    names_df = get_team_names(client=client, main_sheet=main_sheet)
 
     # Create dataframe from all gathered stats
     df = create_stats_df(esea_stats, names_df=names_df)
 
-    df = add_coaches(df, client)
-    df = add_players(df, client)
+    df = add_coaches(df, client, main_sheet)
+    df = add_players(df, client, main_sheet)
     df = reorder_df(df)
-    df = add_pro_teams(df, client)
+    df = add_pro_teams(df, client, main_sheet)
     
     # Uploading the dataframe to google sheets
     print('Uploading statistics to Google Sheets...')
-    upload_stats(df, client, f'Season {season}')
+    upload_stats(df, client, f'Season {season}', main_sheet)
     print('Complete.')
 
 
