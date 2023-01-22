@@ -5,7 +5,8 @@ from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-import undetected_chromedriver as uc
+# import undetected_chromedriver as uc
+from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import pandas as pd
 import itertools
@@ -22,15 +23,15 @@ def get_stats(division_urls: dict, division: str, season: int, country: str = 'U
     Additional teams can be added if for example they do not have the correct country classification
     Entries in the additional_teams are url suffixes for play.esea.net. Each entry must have the following format: '/teams/xxxxxxx'
     """
-    # bar = Bar(f'Getting {division} stats', max=100)
-    # bar.next()
     print(f'Getting {division} statistics...')
     try:
         options = webdriver.ChromeOptions()
         options.add_argument('--user-agent=cat')
         options.add_argument("start-maximized")
         options.add_argument("--headless")
-        driver = uc.Chrome(options=options)
+        #driver = uc.Chrome(options=options)
+        #driver = webdriver.Chrome(executable_path='C:/Users/tom_t/Documents/Python Projects/ukcs_spreadsheet/chromedriver.exe', options=options)
+        driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
         driver.get(division_urls[division])
         WebDriverWait(driver, 5).until(EC.visibility_of_element_located((By.TAG_NAME, 'table')))
     except Exception as error:
@@ -108,6 +109,12 @@ def get_remove_teams(client) -> list:
         return []
 
 
+def get_team_names(client) -> pd.DataFrame:
+    names_sheet = client.open('UKCS Hub Sheet').worksheet('Team Names')
+    names_df = pd.DataFrame(names_sheet.get_all_records())
+    return names_df
+
+
 def sheet_img_formula(img_url):
     if not isinstance(img_url, str):
         return ''
@@ -117,7 +124,7 @@ def sheet_img_formula(img_url):
         return f'=IMAGE("{img_url}")'
 
 
-def create_stats_df(esea_stats: list) -> pd.DataFrame:
+def create_stats_df(esea_stats: list, names_df: pd.DataFrame) -> pd.DataFrame:
     """
     This function takes the ESEA stats scraped by selenium and places them in a dataframe with additional formatting.
     """
@@ -132,6 +139,10 @@ def create_stats_df(esea_stats: list) -> pd.DataFrame:
     df['record'] = df.apply(lambda x: create_record(x['wins'], x['losses']), axis=1)
     df['page_url'] = 'https://play.esea.net' + df['page_url']
     df = df.drop(columns=['logo_url', 'win_streak'])
+
+    for index, row in df.iterrows():
+        if row['page_url'] in names_df['esea_page'].unique():
+            row['team_name'] = names_df.loc[names_df['esea_page'] == row['page_url']]['team_name'].values[0]
 
     return df
 
@@ -160,13 +171,6 @@ def add_players(df: pd.DataFrame, client) -> pd.DataFrame:
     df = df.drop(columns=['team', 'esea_page'])
 
     return df
-
-
-def rename_teams(df: pd.DataFrame, client) -> pd.DataFrame:
-    """
-    This function renames teams based on a table from Google Sheets
-    """
-    pass
 
 
 def reorder_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -234,10 +238,12 @@ def main():
                                     country=country, 
                                     additional_teams=additional_teams, 
                                     blacklisted_teams=blacklisted_teams))
-        time.sleep(3)
+        time.sleep(1.5)
+
+    names_df = get_team_names(client=client)
 
     # Create dataframe from all gathered stats
-    df = create_stats_df(esea_stats)
+    df = create_stats_df(esea_stats, names_df=names_df)
 
     df = add_coaches(df, client)
     df = add_players(df, client)
